@@ -1,0 +1,73 @@
+########################################
+###                                  ###
+###     LSM 800 inverted Z stack     ###
+###                                  ###
+########################################
+
+#Zen.Application.Documents.RemoveAll(False)
+
+#############################################################################
+## DEFINE VARIABLES
+masterStack = ZenImage()
+masterStack.Bounds.IsZStack.TrueString
+
+
+##############################################################################
+## DEFINE FUNCTIONS
+
+def snapImage():
+    hardwaresetting1 = ZenHardwareSetting()
+    hardwaresetting1.SetParameter('MTBLSMLaser2', 'IsEnabled', 'true')
+    Zen.Devices.ApplyHardwareSetting(hardwaresetting1)
+    experiment1 = Zen.Acquisition.Experiments.GetByName("LSM 800 GFP.czexp")
+    image1 = Zen.Acquisition.AcquireImage(experiment1)
+    return(image1)
+
+def zLabel():
+    currentImage = Zen.Application.Documents.ActiveDocument
+    frequentannotations1 = currentImage.Graphics.Add(ZenGraphicCategory.FrequentAnnotations)
+    frequentannotations1.SetBoundRelativeToText = True
+    frequentannotations1.SetDataSource(FrequentAnnotationDataSource.FocusPosition)
+    frequentannotations1.Thickness = 1
+    frequentannotations1.StrokeColor = ZenColors.Red
+    frequentannotations1.TextColor = ZenColors.Red
+    frequentannotations1.IsMeasurementVisible = False
+
+def GUI():
+    window = ZenWindow()
+    window.Initialize('Inverted Z Stack Collection',800,200,True,True)
+    window.AddTextBox("topZ","Enter position for Z stack top","")
+    window.AddTextBox("bottomZ","Enter position for Z stack bottom","")
+    window.AddTextBox("incrementZ","Enter the step increment","")
+    stackWindow = window.Show()
+    
+    topZ = long(stackWindow.GetValue('topZ'))
+    bottomZ = long(stackWindow.GetValue('bottomZ'))
+    incrementZ = long(stackWindow.GetValue('incrementZ'))
+    numSlices = int((topZ - bottomZ)/incrementZ) + 1
+    return(topZ, bottomZ, incrementZ, numSlices)
+
+###############################################################################
+## MAIN ROUTINE
+
+topZ, bottomZ, incrementZ, numSlices = GUI()
+
+for Z in range (0, numSlices):
+    if Z==0:
+        Zen.Devices.Focus.MoveTo(topZ)
+        image1 = snapImage()
+        masterStack = image1
+        Zen.Application.Documents.Add(masterStack)
+        zLabel()
+    else:
+       Zen.Devices.Focus.MoveTo(Zen.Devices.Focus.ActualPosition - incrementZ)
+       image1 = snapImage()
+       masterStack.AddSubImage(image1,0,0,Z)
+
+###############################################################################
+## SAVE AND REOPEN DATA - used as a workaround so that proper Z-stack controls are visible in the GUI
+
+Zen.Application.Save(masterStack,"C:\\Temp\\temp.czi",False)
+Zen.Application.Documents.RemoveAll()
+loadImage = Zen.Application.LoadImage("C:\\Temp\\temp.czi",False)
+Zen.Application.Documents.Add(loadImage)
